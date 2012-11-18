@@ -25,6 +25,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		E070A03D1659386600DC5F6F /* 80train.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = 80train.txt; sourceTree = "<group>"; };
+		E070A03E1659386600DC5F6F /* test.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = test.txt; sourceTree = "<group>"; };
 		E07C2D78165372080049F034 /* DataMining */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = DataMining; sourceTree = BUILT_PRODUCTS_DIR; };
 		E07C2D7C165372080049F034 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		E07C2D7E165372080049F034 /* DataMining.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = DataMining.1; sourceTree = "<group>"; };
@@ -62,6 +64,8 @@
 			children = (
 				E07C2D7C165372080049F034 /* main.cpp */,
 				E07C2D7E165372080049F034 /* DataMining.1 */,
+				E070A03D1659386600DC5F6F /* 80train.txt */,
+				E070A03E1659386600DC5F6F /* test.txt */,
 			);
 			path = DataMining;
 			sourceTree = "<group>";
@@ -204,6 +208,7 @@
 				E07C2D84165372080049F034 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
