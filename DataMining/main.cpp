@@ -17,8 +17,14 @@
 using namespace std;
 
 #define LINEMAXLENGTH 128
-int KNEIGHBOURS = 83 ;
-float CUT =  0.0 ;
+#define USER_KNEIGHBOURS 10
+#define ITEM_KNEIGHBOURS 10
+#define USER_CUT 0.23
+#define ITEM_CUT 0.23
+#define USER_SIMILARITY_CUT 0.1
+#define ITEM_SIMILARITY_CUT 0.1
+#define RATIO 0.5
+
 
 
 struct User {
@@ -30,25 +36,38 @@ struct User {
 struct TestUser {
     int user_id;
 	int resource_id;
-    unsigned long similarity_count;
+    unsigned long similarity_user_count;
+    unsigned long similarity_resource_count;
 	float real_rating;
 	float predict_rating;
 };
 
-struct SimilarityAndUseridType {
+struct SimilarityAndUserType {
     User *user;
     float similarity;
 };
 
 struct SUCompare {
-    bool operator()(const SimilarityAndUseridType &a, const SimilarityAndUseridType &b) const {
+    bool operator()(const SimilarityAndUserType &a, const SimilarityAndUserType &b) const {
+        return a.similarity > b.similarity;
+    }
+};
+
+struct SimilarityAndResourceType {
+    int resource_id;
+    float similarity;
+};
+
+struct SRCompare {
+    bool operator()(const SimilarityAndResourceType &a, const SimilarityAndResourceType &b) const {
         return a.similarity > b.similarity;
     }
 };
 
 
 
-typedef set<SimilarityAndUseridType, SUCompare> KSet;
+typedef set<SimilarityAndUserType, SUCompare> KSUSet;
+typedef set<SimilarityAndResourceType, SRCompare> KSRSet;
 typedef set<User *> UserPtrSet;
 typedef map<int, User> UserMap;
 typedef map<int, UserPtrSet> ResourceMap;
@@ -61,11 +80,14 @@ ResourceMap rid2user_map;
 //测试用户
 vector<TestUser> test_user_list;
 
-//计算target user u和neighbour user v的相似度
-float calculateSimilarity(User u, User v);
-//计算估计值
-float calculatePredictValue(int u_user, int resource_id, KSet k_set);
-
+//计算target user u和neighbour user v的相似度(User-based)
+float calculateSimilarityUB(User u, User v);
+//计算估计值(User-based)
+float calculatePredictValueUB(int u_id, int resource_id, KSUSet k_set);
+//计算相似度(Item-based)
+float calculateSimilarityIB(int i, int j);
+//计算估计值(Item-based)
+float calculatePredictValueIB(int U_id, int resource_id, KSRSet k_set);
 
 int main(int argc, const char * argv[]){
     // insert code here...
@@ -142,17 +164,16 @@ int main(int argc, const char * argv[]){
     test_input_stream.close();
     
     //遍历测试数据，找出预计值
-    for (CUT = 0.1; CUT <= 0.3; CUT += 0.01) {
-    
     float MAE = 0.0f;
-    long all_similarity_count = 0;
-    int user_resource_exist_count = 0;
     vector<TestUser>::iterator test_user_it = test_user_list.begin();
     unsigned long list_size = test_user_list.size();
     for (int i = 0; i < list_size; i++) {
         //用于记录前K个相似用户
-        KSet k_similar_user;
+        KSUSet k_similar_user;
         k_similar_user.clear();
+        //用于记录前K个相似资源
+        KSRSet k_similar_resource;
+        k_similar_resource.clear();
         //查看用户是否在训练集中出现过
         bool user_exist = false;
         UserMap::iterator user_it = uid2user_map.find(test_user_it->user_id);
@@ -168,29 +189,41 @@ int main(int argc, const char * argv[]){
         if (user_exist) {
             if (resource_exist) {
                 //训练集中用户存在，资源存在
-                UserPtrSet same_taste_user = resource_it->second;
-                UserPtrSet::iterator same_taste_user_it = same_taste_user.begin();
-                for (; same_taste_user_it != same_taste_user.end(); same_taste_user_it++) {
-                    float similarity = calculateSimilarity(uid2user_map.find(test_user_it->user_id)->second, **same_taste_user_it);
-                    if (similarity > 0) {
-                        SimilarityAndUseridType tmp;
+                //user_based
+                UserPtrSet *same_taste_user = &resource_it->second;
+                UserPtrSet::iterator same_taste_user_it = same_taste_user->begin();
+                UserPtrSet::iterator same_taste_user_it_end = same_taste_user->end();
+                for (; same_taste_user_it != same_taste_user_it_end; same_taste_user_it++) {
+                    float similarity = calculateSimilarityUB(uid2user_map.find(test_user_it->user_id)->second, **same_taste_user_it);
+                    if (similarity > USER_SIMILARITY_CUT) {
+                        SimilarityAndUserType tmp;
                         tmp.similarity = similarity;
                         tmp.user = *same_taste_user_it;
                         k_similar_user.insert(tmp);
                     }
                 }
-                test_user_it->similarity_count = k_similar_user.size();
-                
-                //............
-                user_resource_exist_count++;
-                all_similarity_count += test_user_it->similarity_count;
-                //............
-                
-                
-                if (test_user_it->similarity_count > 0) {
-                    test_user_it->predict_rating = calculatePredictValue(test_user_it->user_id, test_user_it->resource_id, k_similar_user);
+                test_user_it->similarity_user_count = k_similar_user.size();
+                if (test_user_it->similarity_user_count > 1) {
+                    test_user_it->predict_rating = calculatePredictValueUB(test_user_it->user_id, test_user_it->resource_id, k_similar_user);
                 } else {
                     test_user_it->predict_rating = uid2user_map.find(test_user_it->user_id)->second.avg_rating;
+                }
+                //item_based
+                map<int, float> *rating_map = &user_it->second.rating_map;
+                map<int, float>::iterator target_user_resource_it = rating_map->begin();
+                map<int, float>::iterator target_user_resource_it_end = rating_map->end();
+                for (; target_user_resource_it != target_user_resource_it_end; target_user_resource_it++) {
+                    float similarity = calculateSimilarityIB(test_user_it->resource_id, target_user_resource_it->first);
+                    if (similarity > ITEM_SIMILARITY_CUT) {
+                        SimilarityAndResourceType tmp;
+                        tmp.similarity = similarity;
+                        tmp.resource_id = target_user_resource_it->first;
+                        k_similar_resource.insert(tmp);
+                    }
+                }
+                test_user_it->similarity_resource_count = k_similar_resource.size();
+                if (test_user_it->similarity_resource_count > 1) {
+                    test_user_it->predict_rating = RATIO*test_user_it->predict_rating + (1-RATIO)*calculatePredictValueIB(test_user_it->user_id, test_user_it->resource_id, k_similar_resource);
                 }
             }
             else{
@@ -226,43 +259,41 @@ int main(int argc, const char * argv[]){
         MAE += fabs(test_user_it->predict_rating - test_user_it->real_rating);
         test_user_it++;
     }
-    cout<<CUT<<'\t'<<all_similarity_count/user_resource_exist_count<<'\t'<<MAE/list_size<<endl;
-        KNEIGHBOURS = all_similarity_count/user_resource_exist_count;
-    }
+    cout<<MAE/list_size<<endl;
     return 0;
 }
 
-float calculateSimilarity(User u, User v){
+float calculateSimilarityUB(User u, User v){
     float a = 0, b = 0, c = 0;
-    set<int> u_resources = u.resource_ids;
-    set<int> v_resources = v.resource_ids;
+    set<int> *u_resources = &u.resource_ids;
+    set<int> *v_resources = &v.resource_ids;
     set<int> same_resources;
-    set<int>::iterator u_resource_it = u_resources.begin();
-    set<int>::iterator v_resource_it = v_resources.begin();
+    
     //求出交集
     //one
-    while (u_resource_it != u_resources.end() && v_resource_it != v_resources.end()) {
-        if (*u_resource_it < *v_resource_it) {
-            u_resource_it++;
-        }
-        else{
-            if(*u_resource_it > *v_resource_it){
-                v_resource_it++;
-            }
-            else{
-                same_resources.insert(*u_resource_it);
-                u_resource_it++;
-                v_resource_it++;
-            }
-        }
-    }
+//    set<int>::iterator u_resource_it = u_resources.begin();
+//    set<int>::iterator v_resource_it = v_resources.begin();
+//    while (u_resource_it != u_resources.end() && v_resource_it != v_resources.end()) {
+//        if (*u_resource_it < *v_resource_it) {
+//            u_resource_it++;
+//        }
+//        else{
+//            if(*u_resource_it > *v_resource_it){
+//                v_resource_it++;
+//            }
+//            else{
+//                same_resources.insert(*u_resource_it);
+//                u_resource_it++;
+//                v_resource_it++;
+//            }
+//        }
+//    }
     //two
-    //same_resource_it_end = set_intersection(u_resources.begin(), u_resources.end(), v_resources.begin(), v_resources.end(), same_resource_it);
+    set_intersection(u_resources->begin(), u_resources->end(), v_resources->begin(), v_resources->end(), inserter(same_resources, same_resources.end()));
     
     //相似度计算过滤，若相同集合数量在两个人所拥有的资源数占用比例不超过CUT值，则返回-1
-    float u_rate = float(same_resources.size())/float(u_resources.size());
-    float v_rate = float(same_resources.size())/float(v_resources.size());
-    if (u_rate < CUT && v_rate < CUT) {
+    float u_rate = float(same_resources.size())/float(u_resources->size());
+    if (u_rate < USER_CUT) {
         return -1.0;
     }
     
@@ -270,21 +301,26 @@ float calculateSimilarity(User u, User v){
     //计算
     set<int>::iterator same_resource_it = same_resources.begin();
     set<int>::iterator same_resource_it_end = same_resources.end();
+    map<int, float> *u_rating_map = &u.rating_map;
+    map<int, float> *v_rating_map = &v.rating_map;
+    int u_avg_rating = u.avg_rating;
+    int v_avg_rating = v.avg_rating;
     while (same_resource_it != same_resource_it_end) {
-        a += (u.rating_map.find(*same_resource_it)->second - u.avg_rating) * (v.rating_map.find(*same_resource_it)->second - v.avg_rating);
-        b += (u.rating_map.find(*same_resource_it)->second - u.avg_rating) * (u.rating_map.find(*same_resource_it)->second - u.avg_rating);
-        c += (v.rating_map.find(*same_resource_it)->second - v.avg_rating) * (v.rating_map.find(*same_resource_it)->second - v.avg_rating);
+        a += (u_rating_map->find(*same_resource_it)->second - u_avg_rating) * (v_rating_map->find(*same_resource_it)->second - v_avg_rating);
+        b += (u_rating_map->find(*same_resource_it)->second - u_avg_rating) * (u_rating_map->find(*same_resource_it)->second - u_avg_rating);
+        c += (v_rating_map->find(*same_resource_it)->second - v_avg_rating) * (v_rating_map->find(*same_resource_it)->second - v_avg_rating);
         same_resource_it++;
     }
     return a/(sqrt(b*c));
 }
 
-float calculatePredictValue(int u_user, int resource_id, KSet k_set){
+float calculatePredictValueUB(int u_id, int resource_id, KSUSet k_set){
     float a = 0, b = 0;
-    float ru = uid2user_map.find(u_user)->second.avg_rating;
-    KSet::iterator v_it = k_set.begin();
+    float ru = uid2user_map.find(u_id)->second.avg_rating;
+    KSUSet::iterator v_it = k_set.begin();
+    KSUSet::iterator v_it_end = k_set.end();
     int k_index = 0;
-    for (; v_it != k_set.end() && k_index < KNEIGHBOURS; v_it++, k_index++) {
+    for (; v_it != v_it_end && k_index < USER_KNEIGHBOURS; v_it++, k_index++) {
         a += v_it->similarity * (v_it->user->rating_map.find(resource_id)->second - v_it->user->avg_rating);
         b += abs(v_it->similarity);
     }
@@ -292,7 +328,67 @@ float calculatePredictValue(int u_user, int resource_id, KSet k_set){
 }
 
 
+//计算相似度(Item-based)
+float calculateSimilarityIB(int i, int j){
+    float a = 0, b = 0, c = 0;
+    UserPtrSet *i_user_set = &rid2user_map.find(i)->second;
+    UserPtrSet *j_user_set = &rid2user_map.find(j)->second;
+    UserPtrSet same_user;    
+    //求出交集
+    //one
+//    UserPtrSet::iterator iu_it = i_user_set.begin();
+//    UserPtrSet::iterator ju_it = j_user_set.begin();
+//    while (iu_it != i_user_set.end() && ju_it != j_user_set.end()) {
+//        if (*iu_it < *ju_it) {
+//            iu_it++;
+//        }
+//        else{
+//            if(*iu_it > *ju_it){
+//                ju_it++;
+//            }
+//            else{
+//                same_user.insert(*iu_it);
+//                iu_it++;
+//                ju_it++;
+//            }
+//        }
+//    }
+    //two
+    set_intersection(j_user_set->begin(), j_user_set->end(), i_user_set->begin(), i_user_set->end(), inserter(same_user, same_user.end()));
 
+    
+    //相似度计算过滤
+    float i_rate = float(same_user.size())/float(i_user_set->size());
+    if (i_rate < ITEM_CUT) {
+        return -1.0;
+    }
+    
+    
+    //计算
+    UserPtrSet::iterator same_user_it = same_user.begin();
+    UserPtrSet::iterator same_user_it_end = same_user.end();
+    while (same_user_it != same_user_it_end) {
+        a += ((**same_user_it).rating_map.find(i)->second - (**same_user_it).avg_rating) * ((**same_user_it).rating_map.find(j)->second - (**same_user_it).avg_rating);
+        b += ((**same_user_it).rating_map.find(i)->second - (**same_user_it).avg_rating) * ((**same_user_it).rating_map.find(i)->second - (**same_user_it).avg_rating);
+        c += ((**same_user_it).rating_map.find(j)->second - (**same_user_it).avg_rating) * ((**same_user_it).rating_map.find(j)->second - (**same_user_it).avg_rating);
+        same_user_it++;
+    }
+    return a/(sqrt(b*c));
+}
+
+//计算估计值(Item-based)
+float calculatePredictValueIB(int u_id, int resource_id, KSRSet k_set){
+    float a = 0, b = 0;
+    map<int, float> *rating_map = &uid2user_map.find(u_id)->second.rating_map;
+    KSRSet::iterator j_it = k_set.begin();
+    KSRSet::iterator j_it_end = k_set.end();
+    int k_index = 0;
+    for (; j_it != j_it_end && k_index < ITEM_KNEIGHBOURS; j_it++, k_index++) {
+        a += rating_map->find(j_it->resource_id)->second * (j_it->similarity);
+        b += j_it->similarity;
+    }
+    return a/b;
+}
 
 
 
