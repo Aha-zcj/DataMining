@@ -20,9 +20,9 @@ using namespace std;
 #define USER_KNEIGHBOURS 10
 #define ITEM_KNEIGHBOURS 10
 #define USER_CUT 0.23
-#define ITEM_CUT 0.23
-#define USER_SIMILARITY_CUT 0.1
-#define ITEM_SIMILARITY_CUT 0.1
+#define ITEM_CUT 0.3
+#define USER_SIMILARITY_CUT 0.2
+#define ITEM_SIMILARITY_CUT 0.2
 #define RATIO 0.5
 
 
@@ -90,13 +90,21 @@ float calculateSimilarityIB(int i, int j);
 float calculatePredictValueIB(int U_id, int resource_id, KSRSet k_set);
 
 int main(int argc, const char * argv[]){
+    long time = clock();
     // insert code here...
     ifstream train_input_stream("80train.txt");
     //读入数据，赋给uid2user_map
     while (train_input_stream) {
         int resource_id, user_id, discard;
         float rating;
-        train_input_stream >> user_id >> resource_id >> rating >>discard;
+        train_input_stream >> user_id;
+        
+        if (train_input_stream) {
+            train_input_stream >> resource_id >> rating >>discard;
+        }
+        else{
+            break;
+        }
         
         UserMap::iterator user_it = uid2user_map.find(user_id);
         if (user_it != uid2user_map.end()) {
@@ -112,11 +120,9 @@ int main(int argc, const char * argv[]){
             new_user.rating_map.insert(pair<int, float>(resource_id, rating));
             uid2user_map.insert(pair<int, User>(user_id, new_user));
         }
-        
         train_input_stream.ignore(LINEMAXLENGTH, '\n');
     }
     train_input_stream.close();
-    
     //从uid2user_map构建rid2user_map
     UserMap::iterator user_it = uid2user_map.begin();
     
@@ -157,7 +163,14 @@ int main(int argc, const char * argv[]){
     while (test_input_stream) {
         int discard;
         TestUser tmp;
-        test_input_stream >> tmp.user_id >> tmp.resource_id >> tmp.real_rating >>discard;
+        test_input_stream >> tmp.user_id;
+        if (test_input_stream) {
+            test_input_stream >> tmp.resource_id >> tmp.real_rating >>discard;
+        }
+        else{
+            break;
+        }
+        
         test_user_list.push_back(tmp);
         test_input_stream.ignore(LINEMAXLENGTH, '\n');
     }
@@ -259,7 +272,31 @@ int main(int argc, const char * argv[]){
         MAE += fabs(test_user_it->predict_rating - test_user_it->real_rating);
         test_user_it++;
     }
-    cout<<MAE/list_size<<endl;
+    
+    //输出文件
+    ofstream output("output.txt");
+    output.clear();
+    output<<"user_id\t"<<"resource_id\t"<<"real_rating\t"<<"predict_rating\t"<<endl;
+    test_user_it = test_user_list.begin();
+    for (int i = 0; i < list_size; i++, test_user_it++) {
+        output << test_user_it->user_id << "\t" << test_user_it->resource_id<<"\t"<<test_user_it->real_rating<<"\t"<<test_user_it->predict_rating<<endl;
+    }
+    output << endl;
+    
+    output << "USER_KNEIGHBOURS: " << USER_KNEIGHBOURS << endl;
+    output << "ITEM_KNEIGHBOURS: " << ITEM_KNEIGHBOURS << endl;
+    output << "USER_RATIO_CUT: " << ITEM_KNEIGHBOURS << endl;
+    output << "ITEM_RATIO_CUT: " << ITEM_KNEIGHBOURS << endl;
+    output << "USER_SIMILARITY_CUT: " << ITEM_KNEIGHBOURS << endl;
+    output << "ITEM_SIMILARITY_CUT: " << ITEM_KNEIGHBOURS << endl;
+    output << "RATIO(USER): " << RATIO << endl;
+    output << "RATIO(ITEM): " << 1-RATIO << endl;
+    output << endl;
+    
+    output << "MAE: " << MAE/list_size << endl;
+    output << "RUN TIME: " << double(clock()-time)/CLOCKS_PER_SEC;
+    output.close();
+    
     return 0;
 }
 
