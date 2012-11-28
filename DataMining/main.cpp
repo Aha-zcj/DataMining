@@ -13,17 +13,19 @@
 #include <set>
 #include <vector>
 #include <cmath>
+#include <algorithm>
+#include <iterator>
 
 using namespace std;
 
 #define LINEMAXLENGTH 128
 #define USER_KNEIGHBOURS 30
-#define ITEM_KNEIGHBOURS 20
+#define ITEM_KNEIGHBOURS 10
 #define USER_SIMILARITY_CUT 0.2
 #define ITEM_SIMILARITY_CUT 0.2
 #define USER_SIGNIFICANCE_WEIGHTING 150
-#define ITEM_SIGNIFICANCE_WEIGHTING 150
-#define RATIO 0.5
+#define ITEM_SIGNIFICANCE_WEIGHTING 100
+#define RATIO 0.35 
 
 
 typedef map<int, double> RatingMap;
@@ -223,7 +225,8 @@ int main(int argc, const char * argv[]){
     cout<<"Predicting..."<<endl;
     
     //遍历测试数据，找出预计值
-    double MAE = 0.0f;
+    double MAE = 0.0;
+    double RMSE = 0.0;
     vector<TestUser>::iterator test_user_it = test_user_list.begin();
     unsigned long list_size = test_user_list.size();
     for (int i = 0; i < list_size; i++, test_user_it++) {
@@ -326,6 +329,7 @@ int main(int argc, const char * argv[]){
         
         //累计MAE
         MAE += fabs(test_user_it->predict_rating - test_user_it->real_rating);
+        RMSE += (test_user_it->predict_rating - test_user_it->real_rating)*(test_user_it->predict_rating - test_user_it->real_rating);
         
         if (i%500==0 && i!=0) {
             cout<<i<<": "<<MAE/i<<endl;
@@ -354,6 +358,7 @@ int main(int argc, const char * argv[]){
     output << endl;
     
     output << "MAE: " << MAE/list_size << endl;
+    output << "RMSE: " << sqrt(MAE/list_size) << endl;
     
     double rum_time = double(clock()-time)/CLOCKS_PER_SEC;
     output << "RUN TIME: " << rum_time;
@@ -362,6 +367,7 @@ int main(int argc, const char * argv[]){
     
     
     cout<<"MAE: " << MAE/list_size <<endl;
+    cout<<"RMSE: " << sqrt(MAE/list_size) << endl;
     cout<<"Total time:"<<rum_time<<" sec";
     
     return 0;

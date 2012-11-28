@@ -26,6 +26,8 @@
 
 /* Begin PBXFileReference section */
 		A3CF4F96165CE9C600A03741 /* output.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = output.txt; sourceTree = "<group>"; };
+		E03F4EA21665C9C2003B389B /* Screen Shot .png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Screen Shot .png"; sourceTree = "<group>"; };
+		E03F4EA81665CA09003B389B /* 传统Item—Based协同过滤推荐算法改进.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = "传统Item—Based协同过滤推荐算法改进.pdf"; sourceTree = "<group>"; };
 		E070A03D1659386600DC5F6F /* 80train.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = 80train.txt; sourceTree = "<group>"; };
 		E070A03E1659386600DC5F6F /* test.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = test.txt; sourceTree = "<group>"; };
 		E07C2D78165372080049F034 /* DataMining */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = DataMining; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -63,6 +65,8 @@
 		E07C2D7B165372080049F034 /* DataMining */ = {
 			isa = PBXGroup;
 			children = (
+				E03F4EA81665CA09003B389B /* 传统Item—Based协同过滤推荐算法改进.pdf */,
+				E03F4EA21665C9C2003B389B /* Screen Shot .png */,
 				A3CF4F96165CE9C600A03741 /* output.txt */,
 				E070A03D1659386600DC5F6F /* 80train.txt */,
 				E070A03E1659386600DC5F6F /* test.txt */,
